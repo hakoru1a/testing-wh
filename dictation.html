@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chép Chính Tả</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;600&family=Inter:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #f6f5f2; --bg2: #ffffff; --bg3: #efede8;
+    --fg: #1c1b1a; --fg2: #6b6862; --border: #e0ddd6;
+    --accent: #c4552b; --accent-soft: #f5e4dc;
+    --ok: #2f7d4f; --ok-soft: #e3f2e8;
+    --bad: #c0392b; --bad-soft: #fbe5e2;
+    --serif: 'Noto Serif JP', 'Yu Mincho', serif;
+    --sans: 'Inter', system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121211; --bg2: #1b1a19; --bg3: #252422;
+      --fg: #ecebe8; --fg2: #96928b; --border: #2f2d2a;
+      --accent: #e37350; --accent-soft: #3a2219;
+      --ok: #5cc285; --ok-soft: #173323;
+      --bad: #f0796b; --bad-soft: #3a1a17;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 18px/1.6 var(--sans); }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 32px 24px 60px; display: flex; flex-direction: column; gap: 24px; }
+
+  header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font: 600 30px var(--serif); margin: 0; }
+  select { background: var(--bg2); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font: inherit; font-size: 18px; max-width: 100%; }
+  .counter { margin-left: auto; color: var(--fg2); font-size: 20px; font-variant-numeric: tabular-nums; }
+
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 32px; display: flex; flex-direction: column; gap: 22px; }
+
+  .player { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .play-btn { display: flex; align-items: center; gap: 10px; background: var(--accent); color: #fff; border: none; border-radius: 999px; padding: 14px 30px; font: 600 20px var(--sans); cursor: pointer; }
+  .play-btn:hover { opacity: .9; }
+  .speed { display: flex; align-items: center; gap: 8px; color: var(--fg2); font-size: 16px; }
+  .speed button { background: var(--bg3); border: 1px solid var(--border); color: var(--fg); border-radius: 8px; width: 40px; height: 40px; cursor: pointer; font-size: 20px; }
+  .speed span { min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; color: var(--fg); font-size: 18px; }
+  .seg-bar { flex: 1 1 100%; height: 6px; background: var(--bg3); border-radius: 99px; overflow: hidden; }
+  .seg-bar div { height: 100%; width: 0; background: var(--accent); transition: width .1s linear; }
+
+  .dots { display: flex; flex-wrap: wrap; gap: 6px; }
+  .dot { width: 26px; height: 26px; border-radius: 5px; background: var(--bg3); border: 1px solid var(--border); cursor: pointer; padding: 0; }
+  .dot.cur { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .dot.ok { background: var(--ok); border-color: var(--ok); }
+  .dot.mid { background: #d4a03a; border-color: #d4a03a; }
+  .dot.bad { background: var(--bad); border-color: var(--bad); }
+
+  textarea { width: 100%; min-height: 150px; resize: vertical; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; font: 30px/1.7 var(--serif); outline: none; }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { font: 18px var(--sans); color: var(--fg2); }
+
+  .hint { font: 30px/1.7 var(--serif); letter-spacing: .12em; color: var(--fg2); min-height: 0; }
+  .hint:empty { display: none; }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn { border: 1px solid var(--border); background: var(--bg3); color: var(--fg); border-radius: 9px; padding: 12px 22px; font: 500 18px var(--sans); cursor: pointer; }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.right { margin-left: auto; }
+  .btn.danger { font-size: 15px; padding: 8px 14px; color: var(--bad); }
+  .btn.danger:hover { border-color: var(--bad); }
+  .btn.danger.armed { background: var(--bad); color: #fff; border-color: var(--bad); }
+
+  .result { border-radius: 10px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; }
+  .result.ok { background: var(--ok-soft); }
+  .result.bad { background: var(--bad-soft); }
+  .result-head { font-size: 17px; font-weight: 600; }
+  .result.ok .result-head { color: var(--ok); }
+  .result.bad .result-head { color: var(--bad); }
+  .diff { font: 32px/1.8 var(--serif); word-break: break-all; }
+  .diff .m { color: var(--ok); }
+  .diff .miss { color: var(--bad); text-decoration: underline wavy; text-underline-offset: 7px; }
+  .diff .extra { color: var(--fg2); text-decoration: line-through; opacity: .7; }
+  .answer { font: 26px/1.7 var(--serif); color: var(--fg); }
+
+  kbd { background: var(--bg3); border: 1px solid var(--border); border-radius: 5px; padding: 1px 7px; font: 14px monospace; }
+  .keys { font-size: 15px; color: var(--fg2); display: flex; flex-wrap: wrap; gap: 6px 20px; }
+
+  details { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 18px 24px; }
+  summary { cursor: pointer; font-weight: 600; font-size: 18px; }
+  .review { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+  .rev { display: flex; gap: 14px; align-items: baseline; }
+  .rev-no { font-size: 15px; color: var(--fg2); min-width: 60px; font-variant-numeric: tabular-nums; }
+  .rev-text { font: 22px/1.6 var(--serif); flex: 1; min-width: 0; }
+  .rev-score { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .summary { text-align: center; gap: 14px; font-size: 20px; }
+  .big { font: 600 64px var(--serif); color: var(--accent); }
+
+  .empty { text-align: center; color: var(--fg2); padding: 40px 10px; }
+  code { background: var(--bg3); padding: 1px 6px; border-radius: 4px; }
+  [hidden] { display: none !important; }
+
+  /* ── Nút chọn bài ── */
+  .lesson-btn { display: flex; align-items: center; gap: 10px; background: var(--bg2); color: var(--fg); border: 1px solid var(--border); border-radius: 10px; padding: 9px 16px; font: 600 18px var(--sans); cursor: pointer; }
+  .lesson-btn:hover { border-color: var(--accent); }
+  .lesson-btn .caret { color: var(--fg2); font-size: 14px; }
+
+  /* ── Bảng chọn bài ── */
+  .picker { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.55); display: flex; justify-content: center; align-items: flex-start; padding: 6vh 16px; overflow-y: auto; }
+  .picker-panel { width: 100%; max-width: 900px; background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 26px; display: flex; flex-direction: column; gap: 18px; }
+  .picker-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .picker-head h2 { margin: 0; font: 600 26px var(--serif); }
+  #picker-search { flex: 1; min-width: 140px; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; font: 16px var(--sans); outline: none; }
+  #picker-search:focus { border-color: var(--accent); }
+  .close { padding: 8px 14px; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; color: var(--fg2); }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .lg { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg3); display: inline-block; }
+  .lg.partial { border-color: #d4a03a; background: rgba(212,160,58,.18); }
+  .lg.done { border-color: var(--ok); background: var(--ok-soft); }
+
+  .mondai + .mondai { margin-top: 22px; }
+  .mondai-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .mondai-head h3 { margin: 0; font: 600 20px var(--serif); }
+  .mondai-head span { font-size: 14px; color: var(--fg2); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; }
+  .tile { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 6px 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg3); color: var(--fg); cursor: pointer; font: inherit; }
+  .tile:hover { border-color: var(--accent); }
+  .tile-no { font: 600 26px/1.1 var(--serif); }
+  .tile-meta { font-size: 12px; color: var(--fg2); font-variant-numeric: tabular-nums; }
+  .tile-bar { width: 70%; height: 4px; border-radius: 99px; background: var(--border); overflow: hidden; }
+  .tile-bar i { display: block; height: 100%; background: var(--accent); }
+  .tile.partial { border-color: #d4a03a; background: rgba(212,160,58,.12); }
+  .tile.partial .tile-bar i { background: #d4a03a; }
+  .tile.done { border-color: var(--ok); background: var(--ok-soft); }
+  .tile.done .tile-bar i { background: var(--ok); }
+  .tile.cur { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .picker-empty { color: var(--fg2); text-align: center; padding: 20px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 760px) {
+    body { font-size: 16px; }
+    .wrap { padding: 16px 14px 40px; gap: 16px; }
+    header { gap: 10px; }
+    header h1 { font-size: 22px; }
+    .counter { font-size: 16px; }
+    .lesson-btn { font-size: 16px; padding: 8px 12px; }
+    #group { font-size: 15px; padding: 7px 10px; }
+    .btn.danger { order: 10; flex: 1 1 100%; }
+    .card { padding: 18px; gap: 16px; border-radius: 12px; }
+    .play-btn { flex: 1 1 auto; justify-content: center; font-size: 18px; padding: 13px 20px; }
+    .speed button { width: 44px; height: 44px; }
+    .dots { gap: 5px; }
+    .dot { width: 22px; height: 22px; }
+    textarea { font-size: 22px; min-height: 120px; padding: 14px; }
+    .hint { font-size: 22px; }
+    .actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .actions .btn { width: 100%; font-size: 16px; padding: 12px 10px; }
+    .btn.right { margin-left: 0; }
+    .result { padding: 16px; }
+    .diff { font-size: 24px; }
+    .answer { font-size: 20px; }
+    .keys { display: none; }
+    .rev-text { font-size: 18px; }
+    .big { font-size: 48px; }
+    .summary .actions { grid-template-columns: 1fr; }
+
+    .picker { padding: 0; }
+    .picker-panel { min-height: 100%; border-radius: 0; border: none; padding: 18px 14px; }
+    .picker-head h2 { font-size: 22px; }
+    .tiles { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; }
+    .tile-no { font-size: 22px; }
+  }
+  @media (max-width: 420px) {
+    .speed { flex: 1 1 100%; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>文字起こし</h1>
+    <button class="lesson-btn" id="lesson-btn" hidden><span id="lesson-name">Chọn bài</span><span class="caret">▾</span></button>
+    <select id="group" title="Số câu mỗi lần nghe">
+      <option value="1">Mỗi lần 1 câu</option>
+      <option value="2">Mỗi lần 2 câu</option>
+      <option value="3">Mỗi lần 3 câu</option>
+      <option value="4">Mỗi lần 4 câu</option>
+      <option value="5">Mỗi lần 5 câu</option>
+    </select>
+    <span class="counter" id="counter"></span>
+    <button class="btn danger" id="clear-all" title="Xóa toàn bộ tiến độ đã lưu">Xóa toàn bộ dữ liệu</button>
+  </header>
+
+  <div class="card empty" id="empty" hidden>
+    Chưa có bài nào. Bỏ cặp file cùng tên, ví dụ <code>bai1.mp3</code> và <code>bai1.srt</code>, vào thư mục <code>input/</code> rồi tải lại trang.
+  </div>
+
+  <div class="card" id="main" hidden>
+    <div class="player">
+      <button class="play-btn" id="play">▶ <span id="play-label">Nghe câu 1</span></button>
+      <div class="speed">
+        <button id="slower" title="Chậm hơn ( [ )">−</button>
+        <span id="speed">1.0×</span>
+        <button id="faster" title="Nhanh hơn ( ] )">+</button>
+      </div>
+      <div class="seg-bar"><div id="seg-progress"></div></div>
+    </div>
+
+    <div class="dots" id="dots"></div>
+
+    <textarea id="input" placeholder="Gõ những gì bạn nghe được…" spellcheck="false"></textarea>
+    <div class="hint" id="hint"></div>
+
+    <div class="actions">
+      <button class="btn primary" id="check">Kiểm tra</button>
+      <button class="btn" id="hint-btn">Gợi ý</button>
+      <button class="btn" id="reveal">Xem đáp án</button>
+      <button class="btn" id="clear-one">Xóa câu này</button>
+      <button class="btn right" id="prev">← Trước</button>
+      <button class="btn" id="next">Tiếp →</button>
+    </div>
+
+    <div class="result" id="result" hidden>
+      <div class="result-head" id="result-head"></div>
+      <div class="diff" id="diff"></div>
+      <div class="answer" id="answer"></div>
+    </div>
+
+    <div class="keys">
+      <span><kbd>Ctrl</kbd>+<kbd>Space</kbd> nghe lại</span>
+      <span><kbd>Enter</kbd> kiểm tra</span>
+      <span><kbd>Ctrl</kbd>+<kbd>→</kbd>/<kbd>←</kbd> chuyển câu</span>
+      <span><kbd>Ctrl</kbd>+<kbd>H</kbd> gợi ý</span>
+      <span><kbd>[</kbd> <kbd>]</kbd> tốc độ</span>
+    </div>
+  </div>
+
+  <div class="card summary" id="summary" hidden>
+    <div>Hoàn thành bài</div>
+    <div class="big" id="avg"></div>
+    <div id="summary-text" style="color:var(--fg2)"></div>
+    <div class="actions" style="justify-content:center">
+      <button class="btn primary" id="retry-wrong">Luyện lại câu sai</button>
+      <button class="btn" id="restart">Làm lại từ đầu</button>
+    </div>
+  </div>
+
+  <details id="review-box" hidden>
+    <summary>Câu đã làm (<span id="done-count">0</span>)</summary>
+    <div class="review" id="review"></div>
+  </details>
+</div>
+
+<div class="picker" id="picker" hidden>
+  <div class="picker-panel" role="dialog" aria-label="Chọn bài">
+    <div class="picker-head">
+      <h2>Chọn bài</h2>
+      <input id="picker-search" type="search" placeholder="Tìm: 12, m2…" autocomplete="off">
+      <button class="btn close" id="picker-close" aria-label="Đóng">✕</button>
+    </div>
+    <div class="legend">
+      <span><i class="lg"></i>Chưa làm</span>
+      <span><i class="lg partial"></i>Đang làm</span>
+      <span><i class="lg done"></i>Xong</span>
+    </div>
+    <div id="picker-body"></div>
+  </div>
+</div>
+
+<audio id="audio" preload="auto"></audio>
+
+<script>
+const $ = id => document.getElementById(id);
+const audio = $('audio');
+const input = $('input');
+
+let lessons = [];
+let lesson = null;
+let rawSegs = [];
+let segs = [];
+let group = 1;
+try { group = Math.min(5, Math.max(1, +localStorage.getItem('dictation:group') || 1)); } catch {}
+let idx = 0;
+let state = { idx: 0, results: {} };
+let hintLevel = 0;
+let answerOpen = false;
+let stopAt = null;
+let speed = 1;
+let queue = null; // danh sách câu khi luyện lại câu sai
+
+// ── Lưu trữ tiến độ ──
+const storeKey = name => 'dictation:' + name + (group > 1 ? ':g' + group : '');
+function loadState(name) {
+  try { return JSON.parse(localStorage.getItem(storeKey(name))) || { idx: 0, results: {} }; }
+  catch { return { idx: 0, results: {} }; }
+}
+function saveState() {
+  state.total = segs.length;
+  try { localStorage.setItem(storeKey(lesson.name), JSON.stringify(state)); } catch {}
+}
+
+// ── Tên bài: m1_12 → Mondai 1 · Câu 12 ──
+function parseName(n) {
+  const m = n.match(/^m(?:ondai)?\s*(\d+)[_\-\s.]*(\d+)$/i);
+  return m ? { mondai: +m[1], no: +m[2] } : null;
+}
+function labelOf(n) {
+  const p = parseName(n);
+  return p ? `Mondai ${p.mondai} · Câu ${p.no}` : n;
+}
+
+function lessonProgress(name) {
+  let st = null;
+  try { st = JSON.parse(localStorage.getItem(storeKey(name))); } catch {}
+  if (!st || !st.results) return { done: 0, total: 0, avg: 0 };
+  const rs = Object.values(st.results);
+  const total = st.total || 0;
+  const avg = rs.length ? Math.round(rs.reduce((s, r) => s + r.score, 0) / rs.length) : 0;
+  return { done: rs.length, total, avg };
+}
+
+function renderPicker() {
+  const q = $('picker-search').value.trim().toLowerCase();
+  const groups = new Map();
+  for (const l of lessons) {
+    const p = parseName(l.name);
+    const label = labelOf(l.name).toLowerCase();
+    if (q && !l.name.toLowerCase().includes(q) && !label.includes(q)) continue;
+    const key = p ? p.mondai : Infinity;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ ...l, p });
+  }
+  const keys = [...groups.keys()].sort((a, b) => a - b);
+  if (!keys.length) { $('picker-body').innerHTML = '<div class="picker-empty">Không tìm thấy bài nào.</div>'; return; }
+  $('picker-body').innerHTML = keys.map(k => {
+    const items = groups.get(k).sort((a, b) => (a.p?.no ?? 0) - (b.p?.no ?? 0) || a.name.localeCompare(b.name));
+    const title = k === Infinity ? 'Khác' : `Mondai ${k}`;
+    const tiles = items.map(l => {
+      const pr = lessonProgress(l.name);
+      const status = pr.total && pr.done >= pr.total ? 'done' : pr.done ? 'partial' : '';
+      const pct = pr.total ? Math.round(pr.done / pr.total * 100) : 0;
+      const meta = pr.done ? `${pr.done}/${pr.total || '?'} · ${pr.avg}%` : 'Chưa làm';
+      return `<button class="tile ${status} ${lesson && lesson.name === l.name ? 'cur' : ''}" data-name="${esc(l.name)}" title="${esc(labelOf(l.name))}">
+        <span class="tile-no">${l.p ? l.p.no : esc(l.name)}</span>
+        <span class="tile-bar"><i style="width:${pct}%"></i></span>
+        <span class="tile-meta">${meta}</span>
+      </button>`;
+    }).join('');
+    return `<section class="mondai"><div class="mondai-head"><h3>${title}</h3><span>${items.length} bài</span></div><div class="tiles">${tiles}</div></section>`;
+  }).join('');
+}
+
+function openPicker() {
+  audio.pause();
+  $('picker-search').value = '';
+  renderPicker();
+  $('picker').hidden = false;
+  document.body.style.overflow = 'hidden';
+  const cur = $('picker-body').querySelector('.tile.cur');
+  if (cur) cur.scrollIntoView({ block: 'center' });
+}
+function closePicker() {
+  $('picker').hidden = true;
+  document.body.style.overflow = '';
+  input.focus();
+}
+
+// ── SRT ──
+function parseSRT(text) {
+  return text.replace(/\r/g, '').trim().split(/\n\s*\n/).map(block => {
+    const lines = block.split('\n');
+    const ti = lines.findIndex(l => l.includes('-->'));
+    if (ti < 0) return null;
+    const [a, b] = lines[ti].split('-->').map(s => toSec(s.trim()));
+    const text = lines.slice(ti + 1).join(' ').trim();
+    return text ? { start: a, end: b, text } : null;
+  }).filter(Boolean);
+}
+function toSec(s) {
+  const p = s.replace(',', '.').split(':').map(Number);
+  return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p[0] * 60 + p[1];
+}
+
+// ── So sánh ──
+const PUNCT = /[\s　。、，,．.！!？?…「」『』（）()【】・〜~ー―\-"'“”‘’:：;；]/g;
+const norm = s => s.normalize('NFKC').replace(PUNCT, '').toLowerCase();
+
+function diff(answer, typed) {
+  const a = [...answer], b = [...typed];
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--)
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const ops = [];
+  let i = 0, j = 0;
+  while (i < n || j < m) {
+    if (i < n && j < m && a[i] === b[j]) { ops.push(['m', a[i]]); i++; j++; }
+    else if (j < m && (i >= n || dp[i][j + 1] >= dp[i + 1][j])) { ops.push(['extra', b[j]]); j++; }
+    else { ops.push(['miss', a[i]]); i++; }
+  }
+  const score = n ? Math.round(dp[0][0] / Math.max(n, m) * 100) : 100;
+  return { ops, score };
+}
+
+function esc(s) { return s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+
+// ── Phát audio từng câu ──
+function playSeg() {
+  const s = segs[idx];
+  if (!s) return;
+  audio.currentTime = s.start;
+  stopAt = s.end;
+  audio.playbackRate = speed;
+  audio.play();
+  tick();
+}
+function tick() {
+  const s = segs[idx];
+  if (s) {
+    const p = Math.min(1, Math.max(0, (audio.currentTime - s.start) / (s.end - s.start)));
+    $('seg-progress').style.width = (p * 100) + '%';
+  }
+  if (stopAt !== null && audio.currentTime >= stopAt) {
+    audio.pause();
+    stopAt = null;
+    return;
+  }
+  if (!audio.paused) requestAnimationFrame(tick);
+}
+
+function setSpeed(v) {
+  speed = Math.min(1.5, Math.max(0.5, Math.round(v * 20) / 20));
+  audio.playbackRate = speed;
+  $('speed').textContent = speed.toFixed(2).replace(/0$/, '') + '×';
+}
+
+// ── Hiển thị câu ──
+function show(i) {
+  if (i < 0 || i >= segs.length) return;
+  idx = i;
+  state.idx = i;
+  saveState();
+  hintLevel = 0;
+  answerOpen = false;
+  $('reveal').textContent = 'Xem đáp án';
+  audio.pause();
+  stopAt = null;
+  $('seg-progress').style.width = '0';
+  const s = segs[i];
+  const range = s.from === s.to ? `câu ${s.from}` : `câu ${s.from}–${s.to}`;
+  $('play-label').textContent = group > 1 ? `Nghe đoạn ${i + 1} (${range})` : `Nghe câu ${i + 1}`;
+  $('counter').textContent = group > 1 ? `Đoạn ${i + 1} / ${segs.length}` : `Câu ${i + 1} / ${segs.length}`;
+  $('hint').textContent = '';
+  $('result').hidden = true;
+  $('main').hidden = false;
+  $('summary').hidden = true;
+  const r = state.results[i];
+  input.value = r ? r.typed : '';
+  if (r) renderResult(r.typed, r.revealed);
+  renderDots();
+  input.focus();
+}
+
+function renderDots() {
+  $('dots').innerHTML = segs.map((_, i) => {
+    const r = state.results[i];
+    const cls = r ? (r.score === 100 ? 'ok' : r.score >= 70 ? 'mid' : 'bad') : '';
+    return `<button class="dot ${cls} ${i === idx ? 'cur' : ''}" data-i="${i}" title="Câu ${i + 1}${r ? ' · ' + r.score + '%' : ''}"></button>`;
+  }).join('');
+  renderReview();
+}
+
+function renderResult(typed, revealed) {
+  const ans = segs[idx].text;
+  const { ops, score } = diff(norm(ans), norm(typed));
+  const box = $('result');
+  box.hidden = false;
+  box.className = 'result ' + (score === 100 ? 'ok' : 'bad');
+  $('result-head').textContent = revealed ? `Đã xem đáp án · ${score}%`
+    : score === 100 ? '✓ Chính xác 100%' : `Đúng ${score}% · nghe lại và sửa tiếp, hoặc bấm "Xem đáp án"`;
+  $('diff').hidden = !answerOpen;
+  $('answer').hidden = !answerOpen;
+  $('reveal').textContent = answerOpen ? 'Ẩn đáp án' : 'Xem đáp án';
+  if (!answerOpen) return score;
+  $('diff').innerHTML = typed.trim()
+    ? ops.map(([t, c]) => `<span class="${t}">${esc(c)}</span>`).join('')
+    : '<span style="color:var(--fg2);font:14px var(--sans)">(chưa gõ gì)</span>';
+  $('answer').textContent = 'Đáp án: ' + ans;
+  return score;
+}
+
+function check(revealed = false) {
+  const typed = input.value;
+  if (!typed.trim() && !revealed) return;
+  const prev = state.results[idx];
+  const wasRevealed = revealed || (prev && prev.revealed) || hintLevel >= 3;
+  const score = renderResult(typed, wasRevealed);
+  state.results[idx] = { typed, score, revealed: wasRevealed };
+  saveState();
+  renderDots();
+}
+
+function hint() {
+  const ans = [...norm(segs[idx].text)];
+  hintLevel = Math.min(3, hintLevel + 1);
+  if (hintLevel === 1) $('hint').textContent = ans.map(() => '＿').join('') + `  (${ans.length} chữ)`;
+  if (hintLevel === 2) $('hint').textContent = ans[0] + ans.slice(1).map(() => '＿').join('');
+  if (hintLevel === 3) { $('hint').textContent = ''; answerOpen = true; check(true); }
+}
+
+function toggleAnswer() {
+  answerOpen = !answerOpen;
+  if (answerOpen) return check(true);
+  const r = state.results[idx];
+  renderResult(input.value, !!(r && r.revealed));
+}
+
+function next() {
+  if (queue) {
+    const k = queue.indexOf(idx);
+    if (k >= 0 && k < queue.length - 1) return show(queue[k + 1]);
+    queue = null;
+    return finish();
+  }
+  if (idx < segs.length - 1) show(idx + 1);
+  else finish();
+}
+function prev() {
+  if (queue) {
+    const k = queue.indexOf(idx);
+    if (k > 0) return show(queue[k - 1]);
+    return;
+  }
+  show(idx - 1);
+}
+
+function finish() {
+  audio.pause();
+  const rs = Object.values(state.results);
+  const avg = rs.length ? Math.round(rs.reduce((s, r) => s + r.score, 0) / segs.length) : 0;
+  const wrong = segs.map((_, i) => i).filter(i => !state.results[i] || state.results[i].score < 100);
+  $('avg').textContent = avg + '%';
+  $('summary-text').textContent = wrong.length
+    ? `${segs.length - wrong.length}/${segs.length} câu đúng hoàn toàn · ${wrong.length} câu cần luyện lại`
+    : `Tất cả ${segs.length} câu đều đúng!`;
+  $('retry-wrong').hidden = !wrong.length;
+  $('main').hidden = true;
+  $('summary').hidden = false;
+  $('counter').textContent = 'Tổng kết';
+}
+
+function renderReview() {
+  const done = Object.keys(state.results).map(Number).sort((a, b) => a - b);
+  $('review-box').hidden = !done.length;
+  $('done-count').textContent = done.length;
+  $('review').innerHTML = done.map(i => {
+    const r = state.results[i];
+    const color = r.score === 100 ? 'var(--ok)' : r.score >= 70 ? '#d4a03a' : 'var(--bad)';
+    return `<div class="rev"><span class="rev-no">Câu ${i + 1}</span><span class="rev-text">${r.revealed || r.score === 100 ? esc(segs[i].text) : '<span style="color:var(--fg2);font:15px var(--sans)">(chưa xem đáp án)</span>'}</span><span class="rev-score" style="color:${color}">${r.revealed ? '👁 ' : ''}${r.score}%</span></div>`;
+  }).join('');
+}
+
+// ── Load bài ──
+async function loadLesson(name) {
+  lesson = lessons.find(l => l.name === name);
+  if (!lesson) return;
+  queue = null;
+  const text = await fetch(lesson.srt).then(r => r.text());
+  rawSegs = parseSRT(text);
+  audio.src = lesson.audio;
+  $('lesson-name').textContent = labelOf(name);
+  try { localStorage.setItem('dictation:last', name); } catch {}
+  applyGroup();
+}
+
+function applyGroup() {
+  segs = [];
+  for (let i = 0; i < rawSegs.length; i += group) {
+    const part = rawSegs.slice(i, i + group);
+    segs.push({
+      start: part[0].start,
+      end: part[part.length - 1].end,
+      text: part.map(p => p.text).join(' '),
+      from: i + 1,
+      to: i + part.length,
+    });
+  }
+  queue = null;
+  state = loadState(lesson.name);
+  show(Math.min(state.idx || 0, segs.length - 1));
+}
+
+async function init() {
+  try { lessons = await fetch('/api/list').then(r => r.json()); } catch { lessons = []; }
+  if (!lessons.length) { $('empty').hidden = false; return; }
+  $('lesson-btn').hidden = false;
+  let last = null;
+  try { last = localStorage.getItem('dictation:last'); } catch {}
+  const start = lessons.some(l => l.name === last) ? last
+    : [...lessons].sort((a, b) => b.mtime - a.mtime)[0].name;
+  loadLesson(start);
+}
+
+// ── Sự kiện ──
+$('lesson-btn').addEventListener('click', openPicker);
+$('picker-close').addEventListener('click', closePicker);
+$('picker').addEventListener('click', e => { if (e.target.id === 'picker') closePicker(); });
+$('picker-search').addEventListener('input', renderPicker);
+$('picker-body').addEventListener('click', e => {
+  const t = e.target.closest('.tile');
+  if (!t) return;
+  closePicker();
+  loadLesson(t.dataset.name);
+});
+$('group').value = String(group);
+$('group').addEventListener('change', e => {
+  group = +e.target.value;
+  try { localStorage.setItem('dictation:group', group); } catch {}
+  if (lesson) applyGroup();
+});
+$('play').addEventListener('click', playSeg);
+$('slower').addEventListener('click', () => setSpeed(speed - 0.1));
+$('faster').addEventListener('click', () => setSpeed(speed + 0.1));
+$('check').addEventListener('click', () => check());
+$('hint-btn').addEventListener('click', hint);
+$('reveal').addEventListener('click', toggleAnswer);
+
+$('clear-one').addEventListener('click', () => {
+  delete state.results[idx];
+  saveState();
+  show(idx);
+});
+
+let clearTimer = null;
+$('clear-all').addEventListener('click', () => {
+  const btn = $('clear-all');
+  if (!btn.classList.contains('armed')) {
+    btn.classList.add('armed');
+    btn.textContent = 'Bấm lần nữa để xóa';
+    clearTimer = setTimeout(() => { btn.classList.remove('armed'); btn.textContent = 'Xóa toàn bộ dữ liệu'; }, 3000);
+    return;
+  }
+  clearTimeout(clearTimer);
+  try {
+    Object.keys(localStorage).filter(k => k.startsWith('dictation:')).forEach(k => localStorage.removeItem(k));
+  } catch {}
+  btn.classList.remove('armed');
+  btn.textContent = 'Đã xóa ✓';
+  setTimeout(() => { btn.textContent = 'Xóa toàn bộ dữ liệu'; }, 1500);
+  group = 1;
+  $('group').value = '1';
+  if (lesson) applyGroup();
+});
+$('next').addEventListener('click', next);
+$('prev').addEventListener('click', prev);
+$('dots').addEventListener('click', e => { if (e.target.dataset.i) { queue = null; show(+e.target.dataset.i); } });
+$('restart').addEventListener('click', () => { state = { idx: 0, results: {} }; saveState(); queue = null; show(0); });
+$('retry-wrong').addEventListener('click', () => {
+  queue = segs.map((_, i) => i).filter(i => !state.results[i] || state.results[i].score < 100);
+  queue.forEach(i => delete state.results[i]);
+  saveState();
+  show(queue[0]);
+});
+audio.addEventListener('play', tick);
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+    e.preventDefault();
+    check();
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (!$('picker').hidden) { if (e.key === 'Escape') closePicker(); return; }
+  if (e.ctrlKey && e.code === 'Space') { e.preventDefault(); playSeg(); }
+  else if (e.ctrlKey && e.key === 'ArrowRight') { e.preventDefault(); next(); }
+  else if (e.ctrlKey && e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+  else if (e.ctrlKey && (e.key === 'h' || e.key === 'H')) { e.preventDefault(); hint(); }
+  else if (document.activeElement !== input && e.key === '[') setSpeed(speed - 0.1);
+  else if (document.activeElement !== input && e.key === ']') setSpeed(speed + 0.1);
+});
+
+init();
+</script>
+</body>
+</html>

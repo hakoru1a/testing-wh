@@ -1,0 +1,7 @@
+services:
+  demo-video:
+    build: .
+    container_name: demo-video
+    ports:
+      - "3456:3456"
+    restart: unless-stopped

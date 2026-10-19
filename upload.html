@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MP3 → SRT</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #f5f6f8; color: #222; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+  h1 { font-size: 22px; }
+  #drop { border: 2px dashed #9aa4b2; border-radius: 12px; padding: 40px; text-align: center; background: #fff; cursor: pointer; transition: .15s; }
+  #drop.over { border-color: #3b82f6; background: #eef4ff; }
+  .opts { display: flex; gap: 12px; margin: 16px 0; align-items: center; flex-wrap: wrap; }
+  select, button { padding: 8px 12px; font-size: 14px; border-radius: 8px; border: 1px solid #ccc; }
+  button { background: #3b82f6; color: #fff; border: none; cursor: pointer; }
+  button:disabled { background: #9aa4b2; cursor: default; }
+  .item { background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 2px #0001; }
+  .row { display: flex; justify-content: space-between; font-size: 14px; gap: 8px; }
+  .bar { height: 8px; background: #e5e7eb; border-radius: 4px; margin-top: 8px; overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: #3b82f6; transition: width .3s; }
+  .done .bar > div { background: #22c55e; }
+  .error .bar > div { background: #ef4444; }
+  .status { color: #666; white-space: nowrap; }
+  a { color: #2563eb; }
+</style>
+</head>
+<body>
+<h1>🎙 MP3 → SRT</h1>
+<div id="drop">Kéo thả file âm thanh vào đây hoặc bấm để chọn<br><small>(.mp3 .m4a .wav .ogg .flac .webm)</small></div>
+<input type="file" id="file" multiple accept=".mp3,.m4a,.wav,.ogg,.flac,.webm" hidden>
+
+<div class="opts">
+  <label>Model <select id="model">
+    <option>tiny</option><option>base</option><option>small</option>
+    <option selected>medium</option><option>large-v3</option>
+  </select></label>
+  <label>Ngôn ngữ <select id="lang">
+    <option value="ja" selected>Nhật (ja)</option><option value="en">Anh (en)</option>
+    <option value="vi">Việt (vi)</option><option value="">Tự nhận diện</option>
+  </select></label>
+  <button id="run" disabled>Execute</button>
+  <a href="/">← Về trang luyện nghe</a>
+</div>
+
+<div id="list"></div>
+
+<script>
+const drop = document.getElementById('drop'), input = document.getElementById('file');
+const list = document.getElementById('list'), runBtn = document.getElementById('run');
+const EXTS = ['mp3','m4a','wav','ogg','flac','webm'];
+let queue = [];
+
+drop.onclick = () => input.click();
+input.onchange = () => addFiles(input.files);
+['dragenter','dragover'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', ev => addFiles(ev.dataTransfer.files));
+
+function addFiles(files) {
+  for (const f of files) {
+    if (!EXTS.includes(f.name.split('.').pop().toLowerCase())) continue;
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.innerHTML = `<div class="row"><span class="name"></span><span class="status">Chờ</span></div><div class="bar"><div></div></div>`;
+    el.querySelector('.name').textContent = f.name;
+    list.appendChild(el);
+    queue.push({ file: f, el });
+  }
+  input.value = '';
+  runBtn.disabled = !queue.length;
+}
+
+function set(el, pct, text, cls) {
+  el.querySelector('.bar > div').style.width = pct + '%';
+  el.querySelector('.status').innerHTML = text;
+  if (cls) el.classList.add(cls);
+}
+
+function upload(item, model, lang) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/api/upload?name=${encodeURIComponent(item.file.name)}&model=${model}&lang=${lang}`);
+    xhr.upload.onprogress = e => e.lengthComputable &&
+      set(item.el, e.loaded / e.total * 100, `Upload ${Math.round(e.loaded / e.total * 100)}%`);
+    xhr.onload = () => xhr.status === 200 ? resolve(JSON.parse(xhr.responseText)) : reject(new Error(xhr.responseText));
+    xhr.onerror = () => reject(new Error('Lỗi mạng'));
+    xhr.send(item.file);
+  });
+}
+
+async function poll(item, id) {
+  while (true) {
+    const job = await (await fetch('/api/job?id=' + id)).json();
+    if (job.status === 'done')
+      return set(item.el, 100, `✅ <a href="${job.srt}" download>Tải .srt</a> (${job.segments} đoạn)`, 'done');
+    if (job.status === 'error') return set(item.el, 100, '❌ ' + job.error, 'error');
+    const label = { queued: 'Đang chờ…', loading: 'Đang load model…', running: `Transcribe ${job.progress}%` }[job.status];
+    set(item.el, job.progress, label);
+    await new Promise(r => setTimeout(r, 1000));
+  }
+}
+
+runBtn.onclick = async () => {
+  runBtn.disabled = true;
+  const model = document.getElementById('model').value, lang = document.getElementById('lang').value;
+  const items = queue; queue = [];
+  for (const item of items) {
+    try {
+      const job = await upload(item, model, lang);
+      set(item.el, 0, 'Đang chờ…');
+      await poll(item, job.id);
+    } catch (e) { set(item.el, 100, '❌ ' + e.message, 'error'); }
+  }
+  runBtn.disabled = !queue.length;
+};
+</script>
+</body>
+</html>
