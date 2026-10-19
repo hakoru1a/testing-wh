@@ -4,4 +4,10 @@ services:
     container_name: demo-video
     ports:
       - "3456:3456"
+    volumes:
+      - ./input:/app/input            # mp3/srt + uploads persist across rebuilds
+      - whisper-models:/root/.cache/huggingface  # avoid re-downloading models
     restart: unless-stopped
+
+volumes:
+  whisper-models:

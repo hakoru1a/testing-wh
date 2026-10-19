@@ -18,4 +18,4 @@ COPY . .
 
 EXPOSE 3456
 
-CMD ["python", "app.py"]
+CMD ["python", "serve.py"]
