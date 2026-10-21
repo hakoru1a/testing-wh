@@ -9,6 +9,25 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 BASE  = os.path.dirname(os.path.abspath(__file__))
 INPUT = os.path.join(BASE, 'input')
 PORT  = 3456
+DATA  = os.path.join(BASE, 'data')
+DB_PATH = os.path.join(DATA, 'database.json')
+DB_LOCK = threading.Lock()
+
+
+def db_read():
+    try:
+        with open(DB_PATH, encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def db_write(data):
+    os.makedirs(DATA, exist_ok=True)
+    tmp = DB_PATH + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, DB_PATH)
 AUDIO_EXTS = {'.mp3', '.m4a', '.wav', '.ogg', '.flac', '.webm'}
 NET_ERRORS = (ConnectionAbortedError, ConnectionResetError, BrokenPipeError)
 
@@ -139,6 +158,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_data(200, 'application/json', json.dumps(job))
             return
 
+        if path == '/api/db':
+            with DB_LOCK:
+                self.send_data(200, 'application/json', json.dumps(db_read(), ensure_ascii=False))
+            return
+
         if path == '/api/list':
             self.send_data(200, 'application/json', json.dumps(list_pairs()))
             return
@@ -157,6 +181,25 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         u = urllib.parse.urlparse(self.path)
+        if u.path == '/api/db':
+            try:
+                body = json.loads(self.rfile.read(int(self.headers.get('Content-Length') or 0)) or b'{}')
+            except json.JSONDecodeError:
+                self.send_data(400, 'application/json', '{"error":"invalid json"}')
+                return
+            with DB_LOCK:
+                data = db_read()
+                if 'clear' in body:
+                    for k in [k for k in data if k.startswith(str(body['clear']))]:
+                        del data[k]
+                elif 'key' in body:
+                    if body.get('value') is None:
+                        data.pop(body['key'], None)
+                    else:
+                        data[body['key']] = body['value']
+                db_write(data)
+            self.send_data(200, 'application/json', '{"ok":true}')
+            return
         if u.path != '/api/upload':
             self.send_data(404, 'text/plain', 'Not found')
             return

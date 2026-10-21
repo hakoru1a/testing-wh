@@ -278,7 +278,6 @@ let lesson = null;
 let rawSegs = [];
 let segs = [];
 let group = 1;
-try { group = Math.min(5, Math.max(1, +localStorage.getItem('dictation:group') || 1)); } catch {}
 let idx = 0;
 let state = { idx: 0, results: {} };
 let hintLevel = 0;
@@ -287,15 +286,31 @@ let stopAt = null;
 let speed = 1;
 let queue = null; // danh sách câu khi luyện lại câu sai
 
-// ── Lưu trữ tiến độ ──
+// ── Lưu trữ tiến độ (database.json trên server) ──
+const db = {
+  data: {},
+  async load() {
+    try { this.data = await fetch('/api/db').then(r => r.json()) || {}; } catch { this.data = {}; }
+  },
+  get(k) { return k in this.data ? this.data[k] : null; },
+  send(body) {
+    fetch('/api/db', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .catch(() => {});
+  },
+  set(k, v) { this.data[k] = v; this.send({ key: k, value: v }); },
+  clear(prefix) {
+    Object.keys(this.data).filter(k => k.startsWith(prefix)).forEach(k => delete this.data[k]);
+    this.send({ clear: prefix });
+  },
+};
 const storeKey = name => 'dictation:' + name + (group > 1 ? ':g' + group : '');
 function loadState(name) {
-  try { return JSON.parse(localStorage.getItem(storeKey(name))) || { idx: 0, results: {} }; }
-  catch { return { idx: 0, results: {} }; }
+  const st = db.get(storeKey(name));
+  return st ? JSON.parse(JSON.stringify(st)) : { idx: 0, results: {} };
 }
 function saveState() {
   state.total = segs.length;
-  try { localStorage.setItem(storeKey(lesson.name), JSON.stringify(state)); } catch {}
+  db.set(storeKey(lesson.name), state);
 }
 
 // ── Tên bài: m1_12 → Mondai 1 · Câu 12 ──
@@ -309,8 +324,7 @@ function labelOf(n) {
 }
 
 function lessonProgress(name) {
-  let st = null;
-  try { st = JSON.parse(localStorage.getItem(storeKey(name))); } catch {}
+  const st = db.get(storeKey(name));
   if (!st || !st.results) return { done: 0, total: 0, avg: 0 };
   const rs = Object.values(st.results);
   const total = st.total || 0;
@@ -569,7 +583,7 @@ async function loadLesson(name) {
   rawSegs = parseSRT(text);
   audio.src = lesson.audio;
   $('lesson-name').textContent = labelOf(name);
-  try { localStorage.setItem('dictation:last', name); } catch {}
+  db.set('dictation:last', name);
   applyGroup();
 }
 
@@ -591,11 +605,14 @@ function applyGroup() {
 }
 
 async function init() {
+  await db.load();
+  group = Math.min(5, Math.max(1, +db.get('dictation:group') || 1));
+  $('group').value = String(group);
   try { lessons = await fetch('/api/list').then(r => r.json()); } catch { lessons = []; }
   if (!lessons.length) { $('empty').hidden = false; return; }
   $('lesson-btn').hidden = false;
   let last = null;
-  try { last = localStorage.getItem('dictation:last'); } catch {}
+  last = db.get('dictation:last');
   const start = lessons.some(l => l.name === last) ? last
     : [...lessons].sort((a, b) => b.mtime - a.mtime)[0].name;
   loadLesson(start);
@@ -615,7 +632,7 @@ $('picker-body').addEventListener('click', e => {
 $('group').value = String(group);
 $('group').addEventListener('change', e => {
   group = +e.target.value;
-  try { localStorage.setItem('dictation:group', group); } catch {}
+  db.set('dictation:group', group);
   if (lesson) applyGroup();
 });
 $('play').addEventListener('click', playSeg);
@@ -641,9 +658,7 @@ $('clear-all').addEventListener('click', () => {
     return;
   }
   clearTimeout(clearTimer);
-  try {
-    Object.keys(localStorage).filter(k => k.startsWith('dictation:')).forEach(k => localStorage.removeItem(k));
-  } catch {}
+  db.clear('dictation:');
   btn.classList.remove('armed');
   btn.textContent = 'Đã xóa ✓';
   setTimeout(() => { btn.textContent = 'Xóa toàn bộ dữ liệu'; }, 1500);

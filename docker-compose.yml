@@ -6,6 +6,7 @@ services:
       - "3456:3456"
     volumes:
       - ./input:/app/input            # mp3/srt + uploads persist across rebuilds
+      - ./data:/app/data              # database.json (tiến độ học)
       - whisper-models:/root/.cache/huggingface  # avoid re-downloading models
     restart: unless-stopped
 
